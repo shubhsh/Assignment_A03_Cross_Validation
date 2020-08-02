@@ -1,0 +1,780 @@
+---
+title: "MBA6693 Business Analytics - Assignment - 3: Cross-Validation"
+author: "Shubh Sharma"
+date: "8/1/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+We have used k-fold cross validation on the models we used in the past two assignments on Regression and Classification. This assignment's goal is to apply cross-validation  and to improve previous models with respect to their strength and logic. We evaluate test errors with cross validation techniques comparing with similar models of less and more complexity. We have also used other approximations namely AIC and BIC and have compared their results with the cross-validation test errors.
+
+## Loading Libraries
+
+We load the important R libraries used in this report here.
+
+```{r}
+library(lattice)
+library(ggplot2)
+library(caret)
+library(readxl)
+library(MASS)
+library(dplyr)
+```
+## Real Estate Dataset
+
+First, we go back to Assignment-1 where we prepared regression models for the Real Estate Dataset.
+
+### Loading Data
+
+We load the dataset and rename the columns as shown below:
+
+```{r}
+real_estate_data <- read_excel("real_estate_data.xlsx")
+colnames(real_estate_data)[colnames(real_estate_data) == "X1 transaction date"] <- "x1"
+colnames(real_estate_data)[colnames(real_estate_data) == "X2 house age"] <- "x2"
+colnames(real_estate_data)[colnames(real_estate_data) == "X3 distance to the nearest MRT station"] <- "x3"
+colnames(real_estate_data)[colnames(real_estate_data) == "X4 number of convenience stores"] <- "x4"
+colnames(real_estate_data)[colnames(real_estate_data) == "X5 latitude"] <- "x5"
+colnames(real_estate_data)[colnames(real_estate_data) == "X6 longitude"] <- "x6"
+colnames(real_estate_data)[colnames(real_estate_data) == "Y house price of unit area"] <- "y"
+```
+
+### Modelling
+
+* We have used Forward Selection to prepare our model since there are less number of variables to be considered and it is more feasible to add varibles then eliminate them.
+
+* Here, we start with a null model containing no explanatory variables
+
+* Then, we add variables by evaluating the F-test statistic
+
+
+```{r}
+full=lm(y~., data = real_estate_data)
+null=lm(y~1, data = real_estate_data) 
+add1(null, scope =full, test = "F") 
+```
+
+* We notice that there is a high F-statistic associated with the third row, therefore we add the variable x3 to our model/subset.
+
+* We run the model again with x3 included.
+
+
+```{r}
+add1(update(null, ~ . +x3), scope = full, test = "F")
+```
+
+* We notice that there is a high F-statistic associated with the thrid row, therefore we add the variable x4 to our model/subset.
+
+* We run the model again with x3 and x4 included.
+
+```{r}
+add1(update(null, ~ . +x3+x4), scope = full, test = "F")
+```
+
+* We notice that there is a high F-statistic associated with the second row, therefore we add the variable x2 to our model/subset.
+
+* We run the model again with x2, x3 and x4 included.
+
+
+```{r}
+add1(update(null, ~ . +x3+x4+x2), scope = full, test = "F")
+```
+
+* We notice that there is a high F-statistic associated with the second row, therefore we add the variable x5 to our model/subset.
+
+* We run the model again with x2, x3, x4 and x5 included.
+
+```{r}
+add1(update(null, ~ . +x3+x4+x2+x5), scope = full, test = "F")
+```
+
+* We notice that there is a high F-statistic associated with the first row, therefore we add the variable x1 to our model/subset.
+
+* We run the model again with x1, x2, x3, x4 and x5 included.
+
+
+```{r}
+add1(update(null, ~ . +x3+x4+x2+x5+x1), scope = full, test = "F")
+```
+
+
+* We notice that there is a very low F-statistic associated with the first row, therefore we do not add the variable x6 to our model/subset.
+
+* Our final model contains the variables x1, x2, x3, x4 and x5.
+
+
+```{r}
+model_2 = lm(y~x3+x4+x2+x5+x1, data = real_estate_data)
+summary(model_2)
+```
+
+* The training error on this model is 8.847.
+
+* We see that in Assignment - 1, we had concluded the model obtained by backward elimination as the better one. However, we see that forward elimination works better here due to the smaller number of variables.
+
+* Let us now compare the training error obtained here with cross-validation test errors, AIC and BIC.
+
+
+### K-fold Cross Validation
+
+In K-fold cross-validation , the idea is to randomly divide the data into K equal-sized parts. We leave out part k, fit the model to the other K-1 parts (combined), and then obtain predictions for the left-out kth part.
+
+* Here, we first perform a 10-fold cross validation for different number of predictors.
+
+* Once, we have identified the model that performs the best, we change the value of K and then observe its behavior with respect to the standard error.
+
+* We start with the model with the highest number of predictors.
+
+
+```{r}
+set.seed(7)
+train.control <- trainControl(method = "cv", number = 10)
+# Train the model
+model <- train(y ~ x1+x2+x3+x4+x5, data = real_estate_data , method = "lm",
+               trControl = train.control)
+# Summarize the results
+print(model)
+model=lm(y~x1+x2+x3+x4+x5, data = real_estate_data)
+AIC(model)
+BIC(model)
+summary(model)
+```
+
+* For 5 predictors, we can see that Standard error = 8.651832, AIC = 2987.976, BIC = 3016.157 and Adjusted R-Squared = 0.5772.
+
+* As we decrease the number of predictors, we will see a pattern in the values of the aforementioned parameters.
+
+* Essentially AIC and BIC are not actual test errors. They, instead, are just training errors that have been modified to reflect what the true test errors likely are.
+
+```{r}
+set.seed(7)
+train.control <- trainControl(method = "cv", number = 10)
+# Train the model
+model <- train(y ~ x2+x3+x4+x5, data = real_estate_data , method = "lm",
+               trControl = train.control)
+# Summarize the results
+print(model)
+model=lm(y~x2+x3+x4+x5, data = real_estate_data)
+AIC(model)
+BIC(model)
+summary(model)
+```
+
+* For 4 predictors, we can see that Standard error = 8.954, AIC = 2996.915, BIC = 3021.07 and Adjusted R-Squared = 0.5669 .
+
+* We can see that as the number of predictors have decreased, the error values (both training as well as test errors) have gone up.
+
+
+```{r}
+set.seed(7)
+train.control <- trainControl(method = "cv", number = 10)
+# Train the model
+model <- train(y ~ x3+x4+x5, data = real_estate_data , method = "lm",
+               trControl = train.control)
+# Summarize the results
+print(model)
+
+model=lm(y~x3+x4+x5, data = real_estate_data)
+AIC(model)
+BIC(model)
+summary(model)
+
+
+```
+
+* For 3 predictors, we can see that Standard error = 9.45 , AIC = 3040.536, BIC = 3060.666 and Adjusted R-Squared = 0.5177.
+
+* We can see that as the number of predictors have decreased, the error values (both training as well as test errors) have gone up.
+
+* The value of R-squared has gone down.
+
+
+```{r}
+set.seed(7)
+train.control <- trainControl(method = "cv", number = 10)
+# Train the model
+model <- train(y ~ x4+x5, data = real_estate_data , method = "lm",
+               trControl = train.control)
+# Summarize the results
+print(model)
+
+
+model=lm(y~x4+x5, data = real_estate_data)
+AIC(model)
+BIC(model)
+summary(model)
+```
+
+* For 2 predictors, we can see that Standard error = 10.27 , AIC = 3108.677, BIC = 3124.78 and Adjusted R-Squared = 0.43.
+
+* We can see that as the number of predictors have decreased, the error values (both training as well as test errors) have gone up.
+
+* The value of R-squared has gone down too.
+
+```{r}
+set.seed(7)
+train.control <- trainControl(method = "cv", number = 10)
+# Train the model
+model <- train(y ~ x5, data = real_estate_data , method = "lm",
+               trControl = train.control)
+# Summarize the results
+print(model)
+
+
+model=lm(y~x5, data = real_estate_data)
+AIC(model)
+BIC(model)
+summary(model)
+```
+
+* For 1 predictor, we can see that Standard error = 11.41  , AIC = 3194.664, BIC = 3206.742 and Adjusted R-Squared = 0.2967.
+
+* We can see that as the number of predictors have decreased, the error values (both training as well as test errors) have gone up.
+
+* The value of R-squared has gone down.
+
+* Let us now see the relationship between RMSE and the number of Predictors.
+
+
+```{r}
+dat1 <- data.frame(No_of_Predictors =c(1,2,3,4,5), RMSE = c(11.19879, 10.01563,9.249375,8.745351,8.651832))
+
+dat1
+
+ggplot(dat1, aes(x=No_of_Predictors, y=RMSE)) +
+  geom_point() +
+  geom_line() +
+     labs(x="Model Complexity (No. of Predictors)", y="Test Error (RMSE)", title="Test Error as a Function of Model Complexity")
+```
+
+* We can see that as the number of predictors increase, the error value decreases. The two entities are inversely proportional to each other. This implies that the performance of a model improves as we increase the number of predictors in our model.
+
+* Let us now see the relationship between AIC and the number of Predictors.
+
+
+```{r}
+
+dat2 <- data.frame(No_of_Predictors =c(1,2,3,4,5), AIC = c(3194.664, 3108.677,3040.536,2996.915,2987.976))
+dat2
+
+ggplot(dat2, aes(x=No_of_Predictors, y=AIC)) +
+  geom_point() +
+  geom_line() +
+     labs(x="Model Complexity (No. of Predictors)", y="AIC", title="AIC as a Function of Model Complexity")
+```
+
+* It can be seen that the nature of the plot is similar to the previous one. The value of AIC decreases as the number of predictors increase.
+
+* Let us now see the relationship between BIC and the number of Predictors.
+
+
+
+```{r}
+dat3 <- data.frame(No_of_Predictors =c(1,2,3,4,5), BIC = c(3206.742, 3124.78,3060.666,3021.07,3016.157
+))
+dat3
+
+ggplot(dat3, aes(x=No_of_Predictors, y=BIC)) +
+  geom_point() +
+  geom_line() +
+     labs(x="Model Complexity (No. of Predictors)", y="BIC", title="BIC as a Function of Model Complexity")
+
+```
+
+* It can be seen that the nature of the plot is similar to the previous one. The value of BIC decreases as the number of predictors increase.
+
+
+* Let us now see the relationship between R-Squared and the number of Predictors.
+
+
+
+
+```{r}
+dat4 <- data.frame(No_of_Predictors = c(1,2,3,4,5), RSquared = c(0.2967, 0.43 ,0.5177 ,0.5669 ,0.5772))
+dat4
+
+ggplot(dat4, aes(x=No_of_Predictors, y=RSquared)) +
+  geom_point() +
+  geom_line() +
+     labs(x="Model Complexity (No. of Predictors)", y="Adjusted R-Squared", title="R-Squared as a Function of Model Complexity")
+
+```
+
+* It can be seen that the nature of the plot is opposite to the previous one. The value of R-squared increases as the number of predictors increase.
+
+* This result is in agreement to our previous observations. R-squared increases as the number of predictors increase, thus indicating a better model.
+
+
+* Let us now vary the value of K keeping the number of predictors to 4 and plotting the respective charts.
+
+```{r}
+set.seed(7)
+train.control <- trainControl(method = "cv", number = 3)
+# Train the model
+model <- train(y ~ x1+x2+x3+x4+x5, data = real_estate_data , method = "lm",
+               trControl = train.control)
+print(model)
+
+set.seed(7)
+train.control <- trainControl(method = "cv", number = 5)
+# Train the model
+model <- train(y ~ x1+x2+x3+x4+x5, data = real_estate_data , method = "lm",
+               trControl = train.control)
+print(model)
+
+set.seed(7)
+train.control <- trainControl(method = "cv", number = 7)
+# Train the model
+model <- train(y ~ x1+x2+x3+x4+x5, data = real_estate_data , method = "lm",
+               trControl = train.control)
+print(model)
+
+set.seed(7)
+train.control <- trainControl(method = "cv", number = 10)
+# Train the model
+model <- train(y ~ x1+x2+x3+x4+x5, data = real_estate_data , method = "lm",
+               trControl = train.control)
+print(model)
+```
+
+* Here is a chart that shows the RMSE values as a function of Number of Folds
+
+
+```{r}
+dat4 <- data.frame(No_of_Folds = c(3, 5, 7, 10), RMSE = c(8.841685, 8.821142   ,8.768863   ,8.651832))
+dat4
+
+ggplot(dat4, aes(x=No_of_Folds, y=RMSE)) +
+  geom_point() +
+  geom_line() +
+     labs(x="Number of Folds", y="RMSE", title="RMSE as a Function of Number of Folds")
+
+
+
+```
+
+* According to the 1SE rule, we have the best model at number of predictors = 4 and number of folds (K) = 7.
+
+
+## Iris Dataset
+
+Now, we go back to Assignment-2 where we prepared classification models for the Iris Dataset.
+
+### Loading Data
+
+```{r}
+iris_data_glm <- iris
+```
+
+* Loaded the data from iris_data.csv into the dataframe "iris_data_glm".
+
+
+### K-fold Cross Validation
+
+In K-fold cross-validation , the idea is to randomly divide the data into K equal-sized parts. We leave out part k, fit the model to the other K-1 parts (combined), and then obtain predictions for the left-out kth part.
+
+* Here, we first perform a 10-fold cross validation for different number of predictors.
+
+* Once, we have identified the model that performs the best, we change the value of K and then observe its behavior with respect to the standard error.
+
+* We first discuss the LDA models proposed.
+
+
+### Model LDA.1 (with one predictor)
+
+* This is our model with one predictor
+
+```{r}
+control <- trainControl(method="cv", number=10)
+set.seed(7)
+fit.lda <- train(Species~Sepal.Length, data=iris, method="lda", trControl=control)
+print(fit.lda)
+lda.fit <- lda(Species~Sepal.Length, data=iris, CV = TRUE)
+mean(lda.fit$class != iris$Species)
+```
+
+* We can see that accuracy is 0.74 and Kappa is 0.61. Kappa shows the degree of agreement between the variables and is an important measure of performance.
+
+* The standard error rate is 25.33 percent.
+
+
+
+
+### Model LDA.2 (with two predictors)
+
+* This is our model with 2 predictors
+
+```{r}
+control <- trainControl(method="cv", number=10)
+set.seed(7)
+fit.lda <- train(Species~Sepal.Length+Sepal.Width, data=iris, method="lda", trControl=control)
+print(fit.lda)
+lda.fit <- lda(Species~Sepal.Length+Sepal.Width, data=iris, CV = TRUE)
+mean(lda.fit$class != iris$Species)
+```
+
+
+* We can see that accuracy is 0.8 and Kappa is 0.7. Kappa shows the degree of agreement between the variables and is an important measure of performance.
+
+* The standard error rate is 20.66 percent.
+
+* We can see that the error rate has decreased as the number of predictors has increased.
+
+### Model LDA.3 (with three predictors)
+
+* This is our model with 3 predictors
+
+
+```{r}
+control <- trainControl(method="cv", number=10)
+set.seed(7)
+fit.lda <- train(Species~Sepal.Length+Sepal.Width+Petal.Width, data=iris, method="lda", trControl=control)
+print(fit.lda)
+lda.fit <- lda(Species~Sepal.Length+Sepal.Width+Petal.Width, data=iris, CV = TRUE)
+mean(lda.fit$class != iris$Species)
+```
+
+* We can see that accuracy is 0.95 and Kappa is 0.93. Kappa shows the degree of agreement between the variables and is an important measure of performance.
+
+* The standard error rate is 5.33 percent.
+
+* We can see that the error rate has decreased as the number of predictors has increased.
+
+### Model LDA.4 (with all predictors)
+
+* This is our model with 4 predictors
+
+```{r}
+control <- trainControl(method="cv", number=10)
+set.seed(7)
+fit.lda <- train(Species~., data=iris, method="lda", trControl=control)
+print(fit.lda)
+lda.fit <- lda(Species~., data=iris, CV = TRUE)
+mean(lda.fit$class != iris$Species)
+```
+
+* We can see that accuracy is 0.98 and Kappa is 0.97. Kappa shows the degree of agreement between the variables and is an important measure of performance.
+
+* The standard error rate is 2 percent.
+
+* We can see that the error rate has decreased as the number of predictors has increased.
+
+* Let us now plot the relationship between Accuracy and number of predictors
+
+```{r}
+dat1 <- data.frame(No_of_Predictors =c(1,2,3,4), Accuracy = c(0.74,0.8,0.95,0.98))
+
+dat1
+
+ggplot(dat1, aes(x=No_of_Predictors, y=Accuracy)) +
+  geom_point() +
+  geom_line() +
+     labs(x="Model Complexity (No. of Predictors)", y="Model Performance (Accuracy)", title="Model Performance (Accuracy) as a Function of Model Complexity")
+```
+
+
+* We can see that the accuracy increases as complexity of the model increases.
+
+
+* Let us now plot the relationship between Kappa and number of predictors
+
+```{r}
+
+dat2 <- data.frame(No_of_Predictors =c(1,2,3,4), Kappa = c(0.61,0.7,0.93,0.97))
+
+dat2
+
+ggplot(dat2, aes(x=No_of_Predictors, y=Kappa)) +
+  geom_point() +
+  geom_line() +
+     labs(x="Model Complexity (No. of Predictors)", y="Model Performance (Kappa)", title="Model Performance (Kappa) as a Function of Model Complexity")
+```
+
+* We can see that the Kappa increases as complexity of the model increases.
+
+* Let us now plot the relationship between Standard Error and number of predictors
+
+```{r}
+dat3 <- data.frame(No_of_Predictors =c(1,2,3,4), Std_error = c(0.253,0.206,0.053,0.02))
+
+dat3
+
+ggplot(dat3, aes(x=No_of_Predictors, y=Std_error)) +
+  geom_point() +
+  geom_line() +
+     labs(x="Model Complexity (No. of Predictors)", y="Standard Error", title="Standard Error as a Function of Model Complexity")
+```
+
+* We can see that the standard error decreases as complexity of the model increases.
+
+* All the three charts above point to the same observations, that is, performance improves as the complexity increases.
+
+* Here is function for calculating the standard error as the value of K changes and the number of predictors remain constant.
+
+```{r}
+
+cv.lda <-
+  function (data, model=origin~., yname="origin", K=10, seed=123) {
+    n <- nrow(data)
+    set.seed(seed)
+    datay=data[,yname] #response variable
+    library(MASS)
+    #partition the data into K subsets
+    f <- ceiling(n/K)
+    s <- sample(rep(1:K, f), n)  
+    #generate indices 1:10 and sample n of them  
+    # K fold cross-validated error
+    
+    CV=NULL
+    
+    for (i in 1:K) { #i=1
+      test.index <- seq_len(n)[(s == i)] #test data
+      train.index <- seq_len(n)[(s != i)] #training data
+      
+      #model with training data
+      lda.fit=lda(model, data=data[train.index,])
+      #observed test set y
+      lda.y <- data[test.index, yname]
+      #predicted test set y
+      lda.predy=predict(lda.fit, data[test.index,])$class
+      
+      #observed - predicted on test data
+      error= mean(lda.y!=lda.predy)
+      #error rates 
+      CV=c(CV,error)
+    }
+    #Output
+    list(call = model, K = K, 
+         lda_error_rate = mean(CV), seed = seed)  
+  }
+
+```
+
+* Let us now calculate the errors for different K-values
+
+```{r}
+control <- trainControl(method="cv", number=3)
+set.seed(7)
+fit.lda <- train(Species~., data=iris, method="lda", trControl=control)
+print(fit.lda)
+print(fit.lda$class)
+
+cv.lda(data=iris, model=Species~Sepal.Length+Sepal.Width+Petal.Width, yname="Species", K=3, seed=7)
+
+
+control <- trainControl(method="cv", number=5)
+set.seed(7)
+fit.lda <- train(Species~., data=iris, method="lda", trControl=control)
+print(fit.lda)
+cv.lda(data=iris, model=Species~Sepal.Length+Sepal.Width+Petal.Width, yname="Species", K=5, seed=7)
+
+
+control <- trainControl(method="cv", number=7)
+set.seed(7)
+fit.lda <- train(Species~., data=iris, method="lda", trControl=control)
+print(fit.lda)
+cv.lda(data=iris, model=Species~Sepal.Length+Sepal.Width+Petal.Width, yname="Species", K=7, seed=7)
+
+
+control <- trainControl(method="cv", number=10)
+set.seed(7)
+fit.lda <- train(Species~., data=iris, method="lda", trControl=control)
+print(fit.lda)
+cv.lda(data=iris, model=Species~Sepal.Length+Sepal.Width+Petal.Width, yname="Species", K=10, seed=7)
+```
+
+
+* Here is a table and a chart representing the relationship between the number of folds and the standard error.
+
+
+```{r}
+
+
+
+
+dat2 <- data.frame(Value_of_K =c(3, 5, 7, 10), Error_Rate = c(0.046,0.046,0.039,0.053))
+
+dat2
+
+ggplot(dat2, aes(x=Value_of_K, y=Error_Rate)) +
+  geom_point() +
+  geom_line() +
+     labs(x="Number of Folds", y="LDA Error Rate", title="Standard Error Rate as a Function of Number of Folds")
+```
+
+
+* From 1SE rule we can conclude that the best LDA model has 4 predictors and value of K=7.
+
+
+* Now, we discuss the KNN models evaluated in Assignment-2.
+
+
+### Model kNN.1 (with one predictor)
+
+* Model with one predictor
+
+```{r}
+set.seed(7)
+fit.knn <- train(Species~Sepal.Length, data=iris, method="knn", trControl=control)
+print(fit.knn)
+```
+
+* Accuracy = 0.72 and Kappa = 0.58
+
+
+### Model kNN.2 (with two predictors)
+
+* Model with 2 predictors
+
+```{r}
+set.seed(7)
+fit.knn <- train(Species~Sepal.Length+Sepal.Width, data=iris, method="knn", trControl=control)
+print(fit.knn)
+```
+
+* We can see that the accuracy and Kappa values have increased with an increase in the number of predictors.
+
+### Model kNN.3 (with three predictors)
+
+* Model with 3 predictors
+
+
+```{r}
+set.seed(7)
+fit.knn <- train(Species~Sepal.Length+Sepal.Width+Petal.Length, data=iris, method="knn", trControl=control)
+print(fit.knn)
+```
+
+
+* We can see that the accuracy and Kappa values have increased with an increase in the number of predictors.
+
+### Model kNN.4 (with all predictors)
+
+* Model with 4 predictors
+
+```{r}
+set.seed(7)
+fit.knn <- train(Species~Sepal.Length+Sepal.Width+Petal.Length+Petal.Width, data=iris, method="knn", trControl=control)
+print(fit.knn)
+```
+
+
+* We can see that the accuracy and Kappa values have increased with an increase in the number of predictors.
+
+* Now, we see the relationship between number of predictors and accuracy
+
+
+```{r}
+dat <- data.frame(No_of_Predictors =c(1,2,3,4), Accuracy = c(0.72,0.79,0.93,0.95))
+
+dat
+
+ggplot(dat, aes(x=No_of_Predictors, y=Accuracy))  +
+  geom_point() +
+  geom_line() +
+   labs(x="Model Complexity (No. of Predictors)", y="Model Performance (Accuracy)", title="Model Performance as a Function of Model Complexity")
+```
+
+* We see that performance improves as the complexity of the model increases. This is in agreement to our previous results.
+
+* Here is function for calculating the standard error as the value of K changes and the number of predictors remain constant.
+
+```{r}
+
+cv.knn <-
+  function (data, model=origin~., yname="origin", K=10, seed=123) {
+    n <- nrow(data)
+    set.seed(seed)
+    datay=data[,yname] #response variable
+    library(MASS)
+    #partition the data into K subsets
+    f <- ceiling(n/K)
+    s <- sample(rep(1:K, f), n)  
+    #generate indices 1:10 and sample n of them  
+    # K fold cross-validated error
+    
+    CV=NULL
+    
+    for (i in 1:K) { #i=1
+      test.index <- seq_len(n)[(s == i)] #test data
+      train.index <- seq_len(n)[(s != i)] #training data
+      
+      #model with training data
+      knn.fit=lda(model, data=data[train.index,])
+      #observed test set y
+      knn.y <- data[test.index, yname]
+      #predicted test set y
+      lda.predy=predict(knn.fit, data[test.index,])$class
+      
+      #observed - predicted on test data
+      error= mean(knn.y!=lda.predy)
+      #error rates 
+      CV=c(CV,error)
+    }
+    #Output
+    list(call = model, K = K, 
+         knn_error_rate = mean(CV), seed = seed)  
+  }
+
+```
+
+* Let us now calculate the errors for different K-values
+
+
+```{r}
+control <- trainControl(method="cv", number=3)
+set.seed(7)
+fit.knn <- train(Species~Sepal.Length+Sepal.Width+Petal.Length+Petal.Width, data=iris, method="knn", trControl=control)
+print(fit.knn)
+cv.knn(data=iris, model=Species~Sepal.Length+Sepal.Width+Petal.Width, yname="Species", K=3, seed=73)
+
+control <- trainControl(method="cv", number=5)
+set.seed(7)
+fit.knn <- train(Species~Sepal.Length+Sepal.Width+Petal.Length+Petal.Width, data=iris, method="knn", trControl=control)
+print(fit.knn)
+cv.knn(data=iris, model=Species~Sepal.Length+Sepal.Width+Petal.Width, yname="Species", K=5, seed=73)
+
+control <- trainControl(method="cv", number=7)
+set.seed(7)
+fit.knn <- train(Species~Sepal.Length+Sepal.Width+Petal.Length+Petal.Width, data=iris, method="knn", trControl=control)
+print(fit.knn)
+cv.knn(data=iris, model=Species~Sepal.Length+Sepal.Width+Petal.Width, yname="Species", K=7, seed=73)
+
+  control <- trainControl(method="cv", number=10)
+set.seed(7)
+fit.knn <- train(Species~Sepal.Length+Sepal.Width+Petal.Length+Petal.Width, data=iris, method="knn", trControl=control)
+print(fit.knn)
+cv.knn(data=iris, model=Species~Sepal.Length+Sepal.Width+Petal.Width, yname="Species", K=3, seed=73)
+
+```
+
+
+
+
+```{r}
+
+dat2 <- data.frame(Value_of_K =c(3, 5, 7, 10), Error_Rate = c(0.0533,0.0467,0.0534,0.0533))
+
+dat2
+
+ggplot(dat2, aes(x=Value_of_K, y=Error_Rate)) +
+  geom_point() +
+  geom_line() +
+     labs(x="Number of Folds", y="kNN Error Rate", title="Standard Error Rate as a Function of Number of Folds")
+```
+
+* From 1SE rule we can conclude that the best kNN model has 4 predictors and value of K=3, 10 (second lowest error at k=3, 10).
+
+
+## Conclusion
+
+* We can conclude the following from our experiments in this assignment:
+  * K-fold cross validation if the best method to estimate accurate test errors.
+  * AIC and BIC do not actually represent test errors. They are just training errors adjusted according to the test errors. However, they are in agreement with the values of actual test errors obtained through cross-validation (as observed in the regression cross-validation above).
+  * We have found out the best models among regression and classification models (kNN and LDA) by using cross-validation and 1SE rule. Our models are strong as they have minimized training as well as test errors.
+
